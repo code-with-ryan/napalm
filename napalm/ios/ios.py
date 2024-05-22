@@ -3806,3 +3806,62 @@ class IOSDriver(NetworkDriver):
                 )
 
         return vlans
+    
+    def get_dhcp_server_info(self):
+        """
+        Returns a dictionary with DHCP server configuration and client lease details.
+        """
+        dhcp_info = {}
+        commands = ["show ip dhcp binding", "show ip dhcp pool"]
+        output = self.cli(commands)
+        dhcp_info['bindings'] = self._parse_dhcp_bindings(output['show ip dhcp binding'])
+        dhcp_info['pools'] = self._parse_dhcp_pools(output['show ip dhcp pool'])
+        return dhcp_info
+
+    def _parse_dhcp_bindings(self, output):
+        """
+        Parse the DHCP binding output into a structured format.
+        """
+        bindings = []
+        for line in output.splitlines():
+            if line:
+                parts = line.split()
+                if len(parts) == 6:
+                    binding = {
+                        'ip': parts[0],
+                        'mac': parts[1],
+                        'lease_expiry': parts[2],
+                        'type': parts[3],
+                        'state': parts[4],
+                        'interface': parts[5]
+                    }
+                    bindings.append(binding)
+        return bindings
+
+    def _parse_dhcp_pools(self, output):
+        """
+        Parse the DHCP pools output into a structured format.
+        """
+        pools = []
+        pool = {}
+        for line in output.splitlines():
+            if line.startswith("Pool"):
+                if pool:
+                    pools.append(pool)
+                    pool = {}
+                pool['name'] = line.split()[1]
+            elif line.strip().startswith("Address range"):
+                pool['address_range'] = line.split("range")[1].strip()
+            elif line.strip().startswith("Leases"):
+                pool['leases'] = line.split()[1]
+            elif line.strip().startswith("Allocated"):
+                pool['allocated'] = line.split()[1]
+            elif line.strip().startswith("Remaining"):
+                pool['remaining'] = line.split()[1]
+        if pool:
+            pools.append(pool)
+        return pools
+    
+    
+    
+    
